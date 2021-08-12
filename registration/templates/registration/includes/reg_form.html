@@ -1,0 +1,14 @@
+
+
+{% load bootstrap4 %}
+    <div class="row justify-content-md-center">
+    <div class="col-sm-4">
+    <form action="{% url 'registration' %}" method="post" class="form" enctype="multipart/form-data"
+          oninput='{{ registration_form.confirm_password.html_name }}.setCustomValidity({{ registration_form.confirm_password.html_name }}.value !=
+          {{ registration_form.user_password.html_name }}.value ? "Passwords do not match." : "")'>
+    {% csrf_token %}
+    {% bootstrap_form registration_form size='small' layout='inline' %}
+    {% bootstrap_button "Registr" button_type="submit" button_class="btn-primary" size='small' %}
+    </form>
+    </div>
+    </div>

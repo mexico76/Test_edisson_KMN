@@ -1,0 +1,13 @@
+{% extends "mainfile.html" %}
+
+{% block title %}
+    Registration
+{% endblock %}
+
+{%  block content %}
+    {% if not user.is_authenticated %}
+        {% include 'registration/includes/reg_form.html' %}
+    {% elif user.is_authenticated %}
+     <p>You are allredy loged in! To make registration you must to logout</p>
+    {% endif %}
+{% endblock %}

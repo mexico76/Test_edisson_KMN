@@ -1,0 +1,213 @@
+{% extends "mainfile.html" %}
+{% load static %}
+
+
+{% block title %}
+    Game
+{% endblock %}
+{% block content %}
+        <!-- Modal -->
+    <div class="modal fade" id="Modal" tabindex="-1" role="dialog" aria-labelledby="ModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="ModalLabel">Winner!</h5>
+            <button type="button" class="close" id="id_close_button" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p id="modal-user-name"></p>
+          </div>
+          <div class="modal-footer" id="id_modal_footer">
+            <button type="button" class="btn btn-secondary" id="id_cancel_button" data-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+        <div class="col-sm-8">
+            <h1>The game between {{ user1 }} and {{ user2 }}</h1>
+        </div>
+
+        <div class="col-sm-4">
+            <h2 id="id_timer"></h2>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-sm-2" id="id_game_div_left">
+            <div class="row-sm-3 text-center" id="choose_player1" data-thing="1">
+                <img src="{% static 'images/stone.png' %}" style="max-height: 100px; max-width: 100px" alt="STONE"></div>
+            <div class="row-sm-3 text-center" id="choose_player1" data-thing="2">
+                <img src="{% static 'images/scissors.png' %}" style="max-height: 100px; max-width: 100px" alt="SCICCORS"></div>
+            <div class="row-sm-3 text-center" id="choose_player1" data-thing="3">
+                    <img src="{% static 'images/paper.png' %}" style="max-height: 100px; max-width: 100px" alt="PAPER"></div>
+            <div class="row-sm-3 text-center" id="choose_player1" data-thing="4">
+                    <img src="{% static 'images/lizard.png' %}" style="max-height: 100px; max-width: 100px" alt="LIZARD"></div>
+            <div class="row-sm-3 text-center" id="choose_player1" data-thing="5">
+                    <img src="{% static 'images/spock.webp' %}" style="max-height: 100px; max-width: 100px" alt="SPOK"></div>
+        </div>
+        <div class="border col-sm-8" id="id_log_game">
+            <div class="row">
+                <div class="col-sm-4">
+                    <h4 id="id_round">Round 1</h4>
+                </div>
+                <div class="col-sm-8">
+                    <h4 id="id_user_make_choose"></h4>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6" id="left_score"></div>
+                <div class="col-sm-6" id="right_score"></div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6" id="left_log">
+
+                </div>
+                <div class="col-sm-6" id="right_log">
+
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-2">
+            <div class="row-sm-3 text-center" id="choose_player2">
+                <img src="{% static 'images/stone.png' %}" style="max-height: 100px; max-width: 100px" alt="STONE"></div>
+            <div class="row-sm-3 text-center" id="choose_player2">
+                <img src="{% static 'images/scissors.png' %}" style="max-height: 100px; max-width: 100px" alt="SCICCORS"></div>
+            <div class="row-sm-3 text-center" id="choose_player2">
+                    <img src="{% static 'images/paper.png' %}" style="max-height: 100px; max-width: 100px" alt="PAPER"></div>
+            <div class="row-sm-3 text-center" id="choose_player2">
+                    <img src="{% static 'images/lizard.png' %}" style="max-height: 100px; max-width: 100px" alt="LIZARD"></div>
+            <div class="row-sm-3 text-center" id="choose_player2">
+                    <img src="{% static 'images/spock.webp' %}" style="max-height: 100px; max-width: 100px" alt="SPOK"></div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascript %}
+    <script>
+        let is_choosen = false;
+        let myTimer = setInterval(Timer, 1000);
+        let time = 30;
+        function Timer() {
+            document.getElementById('id_timer').innerText = time;
+            if (time === 0){
+                GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':0}));
+                clearInterval(myTimer);
+                time = 30;
+                setInterval(myTimer, 1000)
+            }
+            else{
+                if (is_choosen === true){
+                    clearInterval(myTimer)
+                    is_choosen = false
+                }
+                else{
+                    --time
+                }
+            }
+        }
+
+        const GameSocket = new WebSocket(
+            'ws://'
+            + window.location.host
+            + '/ws/game-'
+            + '{{ user1 }}-{{ user2 }}/'
+        );
+
+        GameSocket.onopen = function (e) {
+            console.log('socket is open');
+         };
+
+        GameSocket.onclose = function (e) {
+            console.log('socket is cloced');
+        };
+
+        GameSocket.onmessage = function (e) {
+            const data = JSON.parse(e.data);
+            let message = data['message']
+            if (message['winner']){
+                $(document).one('click', '#choose_player1', listenForClicking)
+                clearInterval(myTimer);
+                time = 30;
+                setInterval(myTimer, 1000)
+                $( "#choose_player1" ).unbind("click");
+                {#console.log(message['winner'])#}
+                if (message['winner'].length === 0){
+                    {#    New Round#}
+                    {#    Write users score and his choices  #}
+                    {#    restart timer and reset one clicking for func ListenForClicking#}
+                    document.getElementById('id_user_make_choose').innerText = ``;
+                    round_number = message['user1']['choice'].length + 1;
+                    document.getElementById('id_round').innerText = `Round ${round_number}`;
+                    thing_dict = {
+                        0: 'Not choosen',
+                        1: 'Stone',
+                        2: 'Scissors',
+                        3: 'Paper',
+                        4: 'Lizard',
+                        5: 'Spok'
+                    };
+                    round_winner_dict = {0: 'Fail',
+                                         1: 'Win' };
+                    user1_score = message['user1']['is_round_winner'].filter(x => x==1).length;
+                    user2_score = message['user2']['is_round_winner'].filter(x => x==1).length;
+                    last_index = round_number-2
+                    if (message['user1'] === '{{ curent_user.username }}'){
+                        document.getElementById('left_score').innerHTML = `<h1>${user1_score}</h1>`;
+                        document.getElementById('right_score').innerHTML = `<h1>${user2_score}</h1>`;
+
+                        document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
+                            `<div class="row">${thing_dict[message['user1']['choice'][last_index]]} : `
+                            +` ${round_winner_dict[message['user1']['is_round_winner'][last_index]]}</div>`);
+                        document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
+                            `<div class="row">${thing_dict[message['user2']['choice'][last_index]]} : `
+                            +` ${round_winner_dict[message['user2']['is_round_winner'][last_index]]}</div>`);
+                        document.getElementById('right_log')
+                    }
+                    else {
+                        document.getElementById('right_score').innerHTML = `<h1>${user1_score}</h1>`;
+                        document.getElementById('left_score').innerHTML = `<h1>${user2_score}</h1>`;
+                        document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
+                            `<div class="row">${thing_dict[message['user2']['choice'][last_index]]} : `
+                            + `${round_winner_dict[message['user2']['is_round_winner'][last_index]]}</div>`);
+                        document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
+                            `<div class="row">${thing_dict[message['user1']['choice'][last_index]]} : `
+                            + `${round_winner_dict[message['user1']['is_round_winner'][last_index]]}</div>`);
+                        document.getElementById('right_log')
+                    }
+                }
+                else {
+                    {#    Show winner info in modal by 5 sec#}
+                    $('#Modal').modal('show');
+                    document.getElementById("modal-user-name").innerHTML = `<p>Wiiner data: ${message['winner']} </p>`;
+                    setTimeout(function () {
+                        $('#Modal').modal('hide')
+                        GameSocket.close(1000, 'Game is over')
+                        window.location.href = '/'
+                    }, 5000)
+                }
+            }
+            else {
+                {#    Waiting for user2 choice#}
+                if (message['make_choice']){
+                    if (message['make_choice'] != "{{ curent_user.username }}"){
+                        document.getElementById('id_user_make_choose').innerText = `User "${message['make_choice']}" makes his choice`
+                    }
+                }
+
+            }
+        }
+        $(document).one('click', '#choose_player1', listenForClicking)
+        function listenForClicking(){
+            let thing = $(this).data('thing')
+            document.querySelector(`[data-thing="${thing}"]`).style.background = 'red'
+            GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':thing}))
+            is_choosen = true
+         }
+
+    </script>
+{% endblock %}
+
+

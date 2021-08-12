@@ -1,0 +1,14 @@
+{% extends "mainfile.html" %}
+
+{% block title %}
+    Page not found
+{% endblock %}
+
+<div class="row">
+    {% include 'includes/left_menu.html' %}
+    {%  block content %}
+    <div class="col-md-12">
+        <h1>Page not found</h1>
+    </div>
+    {%  endblock %}
+</div>

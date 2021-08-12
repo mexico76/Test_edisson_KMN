@@ -1,0 +1,12 @@
+{% extends "mainfile.html" %}
+{% block title %}
+    Log in
+{% endblock %}
+
+
+
+{%  block content %}
+    {% load bootstrap4 %}
+    {% bootstrap_alert 'Please login' alert_type='info' %}
+   {% include 'main_page/includes/login_form.html' %}
+{% endblock %}

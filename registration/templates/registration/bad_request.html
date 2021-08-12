@@ -1,0 +1,11 @@
+{% extends "mainfile.html" %}
+
+{% block title %}
+    Bad request
+{% endblock %}
+
+{%  block content %}
+    <p>Bad request</p>
+    <p>{{ error_message.args }} {{ method }} {{ valid_form }}</p>
+    {% include 'registration/includes/reg_form.html' %}
+{%  endblock %}

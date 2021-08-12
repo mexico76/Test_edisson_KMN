@@ -1,0 +1,16 @@
+{% extends "mainfile.html" %}
+{% block title %}
+    The 400 (bad request)
+{% endblock %}
+
+
+<div class="row">
+    {% include 'includes/left_menu.html' %}
+
+    {%  block content %}
+    <div class="col-md-12">
+        <h1>The 400 (bad request)</h1>
+    </div>
+    {%  endblock %}
+</div>
+

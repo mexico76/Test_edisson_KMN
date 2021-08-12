@@ -1,0 +1,164 @@
+{% load static %}
+<p>You are enter to the waiting room. Try to find contestant yourself</p>
+
+<div class="modal">This is modal</div>
+<div id="id_user_list">
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="Modal" tabindex="-1" role="dialog" aria-labelledby="ModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="ModalLabel">Requesting for game</h5>
+        <button type="button" class="close" id="id_close_button" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p id="modal-user-name"></p>
+      </div>
+      <div class="modal-footer" id="id_modal_footer">
+        <button type="button" class="btn btn-secondary" id="id_cancel_button" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% block javascript %}
+    <script>
+        function render_user_list(data) {
+            let users = '';
+            for (element in data) {
+                single_element = data[element];
+                let curent_user = "{{ user.username }}";
+                if (single_element['username'] == curent_user) {}
+                else if (single_element['is_busy']) {
+                     users +=
+                         '<div class="bg-danger col-sm-3 border text-dark">'
+                         + single_element['username']
+                         + '</div>'
+                }
+                else {
+                     users +=
+                         '<a href="#AceptingGame" data-id='
+                         + single_element['username']
+                         + ' id="id_acept_game" data-toggle="modal" data-target="#Modal" class="open_acept_game">'
+                         + '<div class="bg-success col-sm-3 border text-dark">'
+                         + single_element['username']
+                         + '</div>'
+                         + '</a>'
+                }
+            }
+            return users
+        }
+
+        function send_request_for_game_to_server (requester, receiver) {
+            return {'invite_user': {'requester': requester, 'receiver': receiver}}
+        }
+        function send_reject_for_game_to_server (rejector, requester) {
+            return {'reject_user': {'rejector': rejector, 'requester': requester}}
+        }
+        function send_reject_from_requester(requester, receiver) {
+            return {'reject_from_requester': {'requester': requester, 'receiver': receiver}}
+        }
+        function send_agree_for_game_to_server(requester, receiver) {
+            return {'agree_for_game_to_server':{'requester': requester, 'receiver': receiver}}
+        }
+        function agree_function(requester, receiver) {
+            let agree_dict = send_agree_for_game_to_server(requester, receiver);
+            WaitingRoomSocket.send(JSON.stringify(agree_dict))
+        }
+{#-----------------------------------------------------#}
+
+        const WaitingRoomSocket = new WebSocket(
+            'ws://'
+            + window.location.host
+            + '/ws/waiting_room/'
+        );
+
+        WaitingRoomSocket.onopen = function (e) {
+            console.log('User is online');
+         };
+
+        WaitingRoomSocket.onclose = function (e) {
+            console.log('User is offline');
+        };
+
+
+        WaitingRoomSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            let message = data['message']
+            {#Building user_list in page#}
+            if (message['user_list']) {
+                let online_users = render_user_list(message['user_list']);
+                document.querySelector('#id_user_list').innerHTML = (online_users);
+            }
+            if (message['agree_for_game_to_server']) {
+                if (message['agree_for_game_to_server']['requester'] === '{{ user.username }}' ||
+                message['agree_for_game_to_server']['receiver'] === '{{ user.username }}'){
+                    window.location.href = `/game/${message['agree_for_game_to_server']['requester']}-${message['agree_for_game_to_server']['receiver']}`;
+                }
+            }
+            if (message['invite_user']) {
+                if (message['invite_user']['receiver'] === '{{ user.username }}') {
+                    $('#Modal').modal('show');
+                    let receiver = message['invite_user']['receiver']
+                    let requester = message['invite_user']['requester']
+                    document.getElementById("modal-user-name").innerHTML = `<p>${requester} want to play with You </p>`;
+                    document.getElementById("id_modal_footer").innerHTML =
+                        `<button type="button" class="btn btn-primary" data-dismiss="modal"
+                        onclick="agree_function('${requester}', '${receiver}')">Agree</button>
+                        <button type="button" class="btn btn-secondary" id="id_cancel_button" data-dismiss="modal">Cancel</button>`
+                    $('#Modal').on('hidden.bs.modal', function () {
+                        $('body').removeClass('modal-open');
+                        $('.modal-backdrop').remove();
+                        let reject_dict = send_reject_for_game_to_server(receiver, requester);
+                        WaitingRoomSocket.send(JSON.stringify(reject_dict))
+                    })
+                }
+                if (message['invite_user']['requester'] === '{{ user.username }}'){
+                    $('#Modal').on('hide.bs.modal', function () {
+                        let reject_dict = send_reject_from_requester('{{ user.username }}', message['invite_user']['receiver']);
+                        WaitingRoomSocket.send(JSON.stringify(reject_dict))
+                        $('body').removeClass('modal-open');
+                        $('.modal-backdrop').remove();
+                    })
+                 }
+            }
+            if (message['reject_user']) {
+                if (message['reject_user']['requester'] === '{{ user.username }}') {
+                    let rejector = message['reject_user']['rejector'];
+                    let requester = message['reject_user']['requester'];
+                    document.getElementById("modal-user-name").innerHTML = `<p>${rejector} don't want to play with You </p>`;
+                    $('#Modal').on('hidden.bs.modal', function () {
+                        $('body').removeClass('modal-open');
+                        $('.modal-backdrop').remove();
+                    })
+                }
+            }
+            if (message['reject_from_requester']) {
+                if (message['reject_from_requester']['receiver'] === '{{ user.username }}') {
+                    let receiver = message['reject_from_requester']['receiver'];
+                    let requester = message['reject_from_requester']['requester'];
+                    document.getElementById("modal-user-name").innerHTML = `<p>O-ops, He is not(</p>`;
+                    document.getElementById("id_modal_footer").innerHTML =
+                        `<button type="button" class="btn btn-secondary" id="id_cancel_button"
+                        data-dismiss="modal">Cancel</button>`
+                }
+            }
+            };
+        {# on click#}
+        $(document).on("click", ".open_acept_game", function () {
+            let UserID = $(this).data('id');
+            let curent_user = "{{ user }}";
+            document.getElementById("modal-user-name").innerHTML = `Waiting when ${UserID} accept your invite`;
+            document.getElementById("id_modal_footer").innerHTML =
+                        `<button type="button" class="btn btn-secondary" id="id_cancel_button" data-dismiss="modal">Cancel</button>`;
+            let request_dict = send_request_for_game_to_server(curent_user, UserID);
+            WaitingRoomSocket.send(JSON.stringify(request_dict));
+        });
+
+    </script>
+{% endblock %}
