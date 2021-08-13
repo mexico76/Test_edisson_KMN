@@ -118,11 +118,11 @@ class GameConsumer(AsyncWebsocketConsumer):
     }
     KMN_WINER_DICT = {
         0: [],
-        1: [2, 4],
-        2: [3, 4],
-        3: [1, 5],
-        4: [3, 5],
-        5: [1, 2]
+        1: [2, 4, 0],
+        2: [3, 4, 0],
+        3: [1, 5, 0],
+        4: [3, 5, 0],
+        5: [1, 2, 0]
     }
     GAME_DICT = {
         'user1': {'username': '', 'choice': [], 'is_round_winner': []},
@@ -156,13 +156,12 @@ class GameConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         # Leave room group
         await self.__change_busy_status(False)
-
         # print('GAME_DICT: ', self.GAME_DICT)
-        # GAME_DICT = {
-        #     'user1': {'username': '', 'choice': [], 'is_round_winner': []},
-        #     'user2': {'username': '', 'choice': [], 'is_round_winner': []},
-        #     'winner': []
-        # }
+        self.GAME_DICT = {
+            'user1': {'username': '', 'choice': [], 'is_round_winner': []},
+            'user2': {'username': '', 'choice': [], 'is_round_winner': []},
+            'winner': []
+        }
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name,
@@ -179,11 +178,8 @@ class GameConsumer(AsyncWebsocketConsumer):
         if self.GAME_DICT['winner'] == []:
             if user == self.GAME_DICT['user1']['username'] :
                 self.GAME_DICT['user1']['choice'].append((choice))
-            elif user == self.GAME_DICT['user2']['username']:
+            else: #user == self.GAME_DICT['user2']['username']:
                 self.GAME_DICT['user2']['choice'].append((choice))
-            else:
-                '''Wrong path'''
-                print('It is not your game!!! or wrong data')
             if len(self.GAME_DICT['user1']['choice']) == len(self.GAME_DICT['user2']['choice']):
                 '''both users make choice'''
                 if self.GAME_DICT['user2']['choice'][-1] == self.GAME_DICT['user1']['choice'][-1]:
@@ -200,13 +196,14 @@ class GameConsumer(AsyncWebsocketConsumer):
                     self.GAME_DICT['user2']['is_round_winner'].append(1)
                 if self.GAME_DICT['user1']['is_round_winner'].count(1) >= 5:
                     '''Total winner User1'''
-                    winner_data =  await self.__get_winner_data(self.GAME_DICT['user1']['username'])
+                    winner_data = await self.__get_winner_data(self.GAME_DICT['user1']['username'])
                     self.GAME_DICT['winner'] = winner_data
                 elif self.GAME_DICT['user2']['is_round_winner'].count(1) >= 5:
                     '''Total Winner User2'''
                     winner_data = await self.__get_winner_data(self.GAME_DICT['user2']['username'])
                     self.GAME_DICT['winner'] = winner_data
                 message = self.GAME_DICT
+                print(self.GAME_DICT)
             else:
                 '''Only one user make choice'''
                 if len(self.GAME_DICT['user1']['choice']) > len(self.GAME_DICT['user2']['choice']):
@@ -214,10 +211,10 @@ class GameConsumer(AsyncWebsocketConsumer):
                 else:
                     message = {'make_choice': self.GAME_DICT['user2']['username']}
         else:
-            message = {'winner': self.GAME_DICT['winner']}
-            print(self.GAME_DICT)
             '''Winner is allready exist'''
-        print('game_DICT', self.GAME_DICT)
+            message = {'winner': self.GAME_DICT['winner']}
+            # print(self.GAME_DICT)
+        # print('game_DICT', self.GAME_DICT)
         await self.channel_layer.group_send(
             self.room_group_name,
             {

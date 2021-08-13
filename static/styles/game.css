@@ -1,14 +1,14 @@
-#chose_player1, #chose_player2 {
+#choose_player1, #choose_player2 {
     height: 100px
 }
 
-#chose_player1:hover {
-    background-color: #7cbc86;
+#choose_player1:hover {
+    background: transparent;
     opacity: 0.5;
     align-content: center;
 }
 
-#chose_player2 {
+#choose_player2 {
     background-color: #aebabc;
     opacity: 0.5;
     align-content: center;
