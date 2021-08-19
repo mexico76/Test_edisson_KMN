@@ -86,126 +86,131 @@
 {% endblock %}
 
 {% block javascript %}
-    <script>
-        let is_choosen = false;
-        setInterval(myTimer, 1000);
-        let time = 30;
-        function myTimer() {
-            document.getElementById('id_timer').innerText = time;
-            if (time === 0){
-                GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':0}));
+<script>
+    let is_choosen = false;
+    setInterval(myTimer, 1000);
+    let time = 30;
+    function myTimer() {
+        document.getElementById('id_timer').innerText = time;
+        if (time === 0){
+            GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':0}));
+        }
+        else{
+            if (is_choosen === true){
+                clearInterval(myTimer);
             }
             else{
-                if (is_choosen === true){
-                    clearInterval(myTimer);
-                }
-                else{
-                    --time
-                }
+                --time
             }
         }
+    }
 
-        const GameSocket = new WebSocket(
-            'ws://'
-            + window.location.host
-            + '/ws/game-'
-            + '{{ user1 }}-{{ user2 }}/'
-        );
+    const GameSocket = new WebSocket(
+        'ws://'
+        + window.location.host
+        + '/ws/game-'
+        + '{{ user1 }}-{{ user2 }}/'
+    );
 
-        GameSocket.onopen = function (e) {
-            console.log('socket is open');
-         };
+    GameSocket.onopen = function (e) {
+        console.log('socket is open');
+    };
 
-        GameSocket.onclose = function (e) {
-            console.log('socket is cloced');
-        };
+    GameSocket.onclose = function (e) {
+        console.log('socket is cloced');
+    };
 
-        GameSocket.onmessage = function (e) {
-            const data = JSON.parse(e.data);
-            let message = data['message'];
-            if (message['winner']){
-                $(document).one('click', '#choose_player1', listenForClicking)
-                {#string below can send multiple answer if users do not answed some times, but it can reset state of#}
-                {# (Element).one('click' F)  (((                #}
-                is_choosen = false;
-                time = 30;
-                if (message['winner'].length === 0){
-                    {#    New Round#}
-                    {#    Write users score and his choices  #}
-                    {#    restart timer and reset one clicking for func ListenForClicking#}
-                    document.getElementById('id_user_make_choose').innerText = ``;
-                    round_number = message['user1']['choice'].length + 1;
-                    document.getElementById('id_round').innerText = `Round ${round_number}`;
+    GameSocket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+        let message = data['message'];
+        if (message['winner']){
+            if (is_choosen){
+                $(document).one('click', '#choose_player1', listenForClicking);
+            }
+            {#click_listen.empty();#}
+            {#click_listen = $(document).one('click', '#choose_player1', listenForClicking);#}
+            {#click_listen()#}
+            {#string below can send multiple answer if users do not answed some times, but it can reset state of#}
+            {# (Element).one('click' F)  (((                #}
+            is_choosen = false;
+            time = 30;
+            if (message['winner'].length === 0){
+                {#    New Round#}
+                {#    Write users score and his choices  #}
+                {#    restart timer and reset one clicking for func ListenForClicking#}
+                document.getElementById('id_user_make_choose').innerText = ``;
+                round_number = message['user1']['choice'].length + 1;
+                document.getElementById('id_round').innerText = `Round ${round_number}`;
 
-                    thing_dict = {
-                        0: 'Not choosen',
-                        1: 'Stone',
-                        2: 'Scissors',
-                        3: 'Paper',
-                        4: 'Lizard',
-                        5: 'Spok'
-                    };
-                    round_winner_dict = {0: 'Fail',
-                                         1: 'Win' };
-                    user1_score = message['user1']['is_round_winner'].filter(x => x===1).length;
-                    user2_score = message['user2']['is_round_winner'].filter(x => x===1).length;
-                    last_index_choice = message['user1']['choice'].length - 1;
-                    last_index_win = message['user1']['is_round_winner'].length - 1;
-                    if (message['user1']['username'] === '{{ curent_user.username }}'){
-                        document.getElementById('left_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
-                        document.getElementById('right_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
-                        document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
-                            `<div class="row">${thing_dict[message['user1']['choice'][last_index_choice]]} : `
-                            +` ${round_winner_dict[message['user1']['is_round_winner'][last_index_choice]]}</div>`);
-                        document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
-                            `<div class="row">${thing_dict[message['user2']['choice'][last_index_win]]} : `
-                            +` ${round_winner_dict[message['user2']['is_round_winner'][last_index_win]]}</div>`);
-                    }
-                    else {
-                        document.getElementById('right_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
-                        document.getElementById('left_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
-                        document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
-                            `<div class="row">${thing_dict[message['user2']['choice'][last_index_choice]]} : `
-                            + `${round_winner_dict[message['user2']['is_round_winner'][last_index_choice]]}</div>`);
-                        document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
-                            `<div class="row">${thing_dict[message['user1']['choice'][last_index_win]]} : `
-                            + `${round_winner_dict[message['user1']['is_round_winner'][last_index_win]]}</div>`);
-                    }
+                thing_dict = {
+                    0: 'Not choosen',
+                    1: 'Stone',
+                    2: 'Scissors',
+                    3: 'Paper',
+                    4: 'Lizard',
+                    5: 'Spok'
+                };
+                round_winner_dict = {0: 'Fail',
+                    1: 'Win' };
+                user1_score = message['user1']['is_round_winner'].filter(x => x===1).length;
+                user2_score = message['user2']['is_round_winner'].filter(x => x===1).length;
+                last_index_choice = message['user1']['choice'].length - 1;
+                last_index_win = message['user1']['is_round_winner'].length - 1;
+                if (message['user1']['username'] === '{{ curent_user.username }}'){
+                    document.getElementById('left_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
+                    document.getElementById('right_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
+                    document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
+                        `<div class="row">${thing_dict[message['user1']['choice'][last_index_choice]]} : `
+                        +` ${round_winner_dict[message['user1']['is_round_winner'][last_index_choice]]}</div>`);
+                    document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
+                        `<div class="row">${thing_dict[message['user2']['choice'][last_index_win]]} : `
+                        +` ${round_winner_dict[message['user2']['is_round_winner'][last_index_win]]}</div>`);
                 }
                 else {
-                    {#    Show winner info in modal by 5 sec#}
-                    $('#Modal').modal('show');
-                    document.getElementById("modal-user-name").innerHTML = `<p>Wiiner data: ${message['winner']} </p>`;
-                    setTimeout(function () {
-                        $('#Modal').modal('hide');
-                        GameSocket.close(1000, 'Game is over');
-                        window.location.href = '/'
-                    }, 5000)
+                    document.getElementById('right_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
+                    document.getElementById('left_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
+                    document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
+                        `<div class="row">${thing_dict[message['user2']['choice'][last_index_choice]]} : `
+                        + `${round_winner_dict[message['user2']['is_round_winner'][last_index_choice]]}</div>`);
+                    document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
+                        `<div class="row">${thing_dict[message['user1']['choice'][last_index_win]]} : `
+                        + `${round_winner_dict[message['user1']['is_round_winner'][last_index_win]]}</div>`);
                 }
-                document.querySelectorAll('div#choose_player1').forEach(el => {
-                    el.style.background = "transparent";
-
-                });
             }
             else {
-                {#    Waiting for user2 choice#}
-                if (message['make_choice']){
-                    if (message['make_choice'] != "{{ curent_user.username }}"){
-                        document.getElementById('id_user_make_choose').innerText = `User "${message['make_choice']}" makes his choice`
-                    }
-                }
-
+                {#    Show winner info in modal by 5 sec#}
+                $('#Modal').modal('show');
+                document.getElementById("modal-user-name").innerHTML = `<p>Winner data: ${message['winner']} </p>`;
+                setTimeout(function () {
+                    $('#Modal').modal('hide');
+                    GameSocket.close(1000, 'Game is over');
+                    window.location.href = '/'
+                }, 5000)
             }
+            document.querySelectorAll('div#choose_player1').forEach(el => {
+                el.style.background = "transparent";
+
+            });
         }
-        $(document).one('click', '#choose_player1', listenForClicking)
-        function listenForClicking(){
-            let thing = $(this).data('thing')
-            document.querySelector(`[data-thing="${thing}"]`).style.background = 'red'
-            GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':thing}))
-            is_choosen = true
-         }
+        else {
+            {#    Waiting for user2 choice#}
+            if (message['make_choice']){
+                if (message['make_choice'] != "{{ curent_user.username }}"){
+                    document.getElementById('id_user_make_choose').innerText = `User "${message['make_choice']}" makes his choice`
+                }
+            }
 
-    </script>
+        }
+    };
+    $(document).one('click', '#choose_player1', listenForClicking);
+    {#let click_listen = $(document).one('click', '#choose_player1', listenForClicking);#}
+    {#click_listen();#}
+    function listenForClicking(){
+        let thing = $(this).data('thing');
+        document.querySelector(`[data-thing="${thing}"]`).style.background = 'red';
+        GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':thing}));
+        is_choosen = true
+    }
+
+</script>
 {% endblock %}
-
-

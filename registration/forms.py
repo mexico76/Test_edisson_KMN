@@ -1,9 +1,13 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
+
 
 class RegistrationForm(forms.Form):
-    user_login = forms.CharField(label='Login', max_length=30)
+    user_login = forms.CharField(label='Login', min_length=3, max_length=30,
+                                 validators=[RegexValidator(r'^[\w+]$',
+                                message="Password should be only alphanumeric characters")])
     user_password = forms.CharField(label='Password', min_length=8, widget=forms.PasswordInput())
     confirm_password = forms.CharField(label='Confirm password', min_length=8, widget=forms.PasswordInput())
     user_name = forms.CharField(label='Your name', max_length=30)
