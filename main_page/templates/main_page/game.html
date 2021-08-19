@@ -127,11 +127,6 @@
             if (is_choosen){
                 $(document).one('click', '#choose_player1', listenForClicking);
             }
-            {#click_listen.empty();#}
-            {#click_listen = $(document).one('click', '#choose_player1', listenForClicking);#}
-            {#click_listen()#}
-            {#string below can send multiple answer if users do not answed some times, but it can reset state of#}
-            {# (Element).one('click' F)  (((                #}
             is_choosen = false;
             time = 30;
             if (message['winner'].length === 0){
@@ -203,8 +198,6 @@
         }
     };
     $(document).one('click', '#choose_player1', listenForClicking);
-    {#let click_listen = $(document).one('click', '#choose_player1', listenForClicking);#}
-    {#click_listen();#}
     function listenForClicking(){
         let thing = $(this).data('thing');
         document.querySelector(`[data-thing="${thing}"]`).style.background = 'red';
