@@ -38,15 +38,15 @@
     <div class="row">
         <div class="col-sm-2" id="id_game_div_left">
             <div class="row-sm-3 text-center" id="choose_player1" data-thing="1">
-                <img src="{% static 'images/stone.png' %}" style="max-height: 100px; max-width: 100px" alt="STONE"></div>
+                <img src="{% static 'images/stone.png' %}" id="id_image" alt="STONE"></div>
             <div class="row-sm-3 text-center" id="choose_player1" data-thing="2">
-                <img src="{% static 'images/scissors.png' %}" style="max-height: 100px; max-width: 100px" alt="SCICCORS"></div>
+                <img src="{% static 'images/scissors.png' %}" id="id_image" alt="SCICCORS"></div>
             <div class="row-sm-3 text-center" id="choose_player1" data-thing="3">
-                    <img src="{% static 'images/paper.png' %}" style="max-height: 100px; max-width: 100px" alt="PAPER"></div>
+                    <img src="{% static 'images/paper.png' %}" id="id_image" alt="PAPER"></div>
             <div class="row-sm-3 text-center" id="choose_player1" data-thing="4">
-                    <img src="{% static 'images/lizard.png' %}" style="max-height: 100px; max-width: 100px" alt="LIZARD"></div>
+                    <img src="{% static 'images/lizard.png' %}" id="id_image" alt="LIZARD"></div>
             <div class="row-sm-3 text-center" id="choose_player1" data-thing="5">
-                    <img src="{% static 'images/Spock.webp' %}" style="max-height: 100px; max-width: 100px" alt="SPOK"></div>
+                    <img src="{% static 'images/Spock.webp' %}" id="id_image" alt="SPOK"></div>
         </div>
         <div class="border col-sm-8" id="id_log_game">
             <div class="row">
@@ -71,16 +71,16 @@
             </div>
         </div>
         <div class="col-sm-2">
-            <div class="row-sm-3 text-center" id="choose_player2">
-                <img src="{% static 'images/stone.png' %}" style="max-height: 100px; max-width: 100px" alt="STONE"></div>
-            <div class="row-sm-3 text-center" id="choose_player2">
-                <img src="{% static 'images/scissors.png' %}" style="max-height: 100px; max-width: 100px" alt="SCICCORS"></div>
-            <div class="row-sm-3 text-center" id="choose_player2">
-                    <img src="{% static 'images/paper.png' %}" style="max-height: 100px; max-width: 100px" alt="PAPER"></div>
-            <div class="row-sm-3 text-center" id="choose_player2">
-                    <img src="{% static 'images/lizard.png' %}" style="max-height: 100px; max-width: 100px" alt="LIZARD"></div>
-            <div class="row-sm-3 text-center" id="choose_player2">
-                    <img src="{% static 'images/Spock.webp' %}" style="max-height: 100px; max-width: 100px" alt="SPOK"></div>
+            <div class="row-sm-3 text-center" id="choose_player2" data-thing="1">
+                <img src="{% static 'images/stone.png' %}" id="id_image" alt="STONE"></div>
+            <div class="row-sm-3 text-center" id="choose_player2" data-thing="2">
+                <img src="{% static 'images/scissors.png' %}" id="id_image" alt="SCICCORS"></div>
+            <div class="row-sm-3 text-center" id="choose_player2" data-thing="3">
+                    <img src="{% static 'images/paper.png' %}" id="id_image" alt="PAPER"></div>
+            <div class="row-sm-3 text-center" id="choose_player2" data-thing="4">
+                    <img src="{% static 'images/lizard.png' %}" id="id_image" alt="LIZARD"></div>
+            <div class="row-sm-3 text-center" id="choose_player2" data-thing="5">
+                    <img src="{% static 'images/Spock.webp' %}" id="id_image" alt="SPOK"></div>
         </div>
     </div>
 {% endblock %}
@@ -90,10 +90,13 @@
     let is_choosen = false;
     setInterval(myTimer, 1000);
     let time = 30;
+
     function myTimer() {
         document.getElementById('id_timer').innerText = time;
         if (time === 0){
+            {#clearInterval(myTimer)#}
             GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':0}));
+            time = -1
         }
         else{
             if (is_choosen === true){
@@ -121,71 +124,160 @@
     };
 
     GameSocket.onmessage = function (e) {
-        const data = JSON.parse(e.data);
-        let message = data['message'];
-        if (message['winner']){
+        {#--------------help functions----------------#}
+        function reset_timer_clear_temp () {
+            {#Clear temp data#}
+            document.getElementById('id_user_make_choose').innerText = ``;
+            document.querySelectorAll('div#choose_player1').forEach(el => {
+                el.style.background = "transparent";
+            });
+            document.querySelectorAll('div#choose_player2').forEach(el => {
+                el.style.background = "transparent";
+            });
+            {#Reset timer and one click event#}
             if (is_choosen){
                 $(document).one('click', '#choose_player1', listenForClicking);
-            }
+             }
             is_choosen = false;
             time = 30;
+        }
+        function write_game_log_and_score(round_number, thing_dict, round_winner_dict, user1_score,
+                                          user2_score, last_index_choice, last_index_win) {
+            document.getElementById('id_round').innerText = `Round ${round_number}`;
+            if (message['user1']['username'] === '{{ curent_user.username }}'){
+                document.getElementById('left_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
+                document.getElementById('right_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
+                document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
+                    `<div class="row">${thing_dict[message['user1']['choice'][last_index_choice]]} : `
+                    +` ${round_winner_dict[message['user1']['is_round_winner'][last_index_choice]]}</div>`);
+                document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
+                    `<div class="row">${thing_dict[message['user2']['choice'][last_index_win]]} : `
+                    +` ${round_winner_dict[message['user2']['is_round_winner'][last_index_win]]}</div>`);
+            }
+            else {
+                document.getElementById('right_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
+                document.getElementById('left_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
+                document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
+                    `<div class="row">${thing_dict[message['user2']['choice'][last_index_choice]]} : `
+                    + `${round_winner_dict[message['user2']['is_round_winner'][last_index_choice]]}</div>`);
+                document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
+                    `<div class="row">${thing_dict[message['user1']['choice'][last_index_win]]} : `
+                    + `${round_winner_dict[message['user1']['is_round_winner'][last_index_win]]}</div>`);
+            }
+        }
+        function show_winner_info() {
+            {#    Show winner info in modal by 5 sec#}
+            $('#Modal').modal('show');
+            document.getElementById("modal-user-name").innerHTML = `<p>Winner data: ${message['winner']} </p>`;
+            setTimeout(function () {
+                $('#Modal').modal('hide');
+                GameSocket.close(1000, 'Game is over');
+                window.location.href = '/'
+            }, 5000)
+        }
+        function output_players_choice(message, last_index_win, last_index_choice) {
+            {#Output Chooses of players#}
+            if (message['user1']['is_round_winner'][last_index_win] === 0 &
+                message['user2']['is_round_winner'][last_index_win] === 0){
+                document.getElementById('id_user_make_choose').innerText = `No one player win round`;
+                document.querySelectorAll('div#choose_player1').forEach(el => {
+                    if (el.dataset.thing === `${message['user1']['choice'][last_index_choice]}`){
+                        el.style.background = "red";
+                    }
+                });
+                document.querySelectorAll('div#choose_player2').forEach(el => {
+                    if (el.dataset.thing === `${message['user2']['choice'][last_index_choice]}`){
+                        el.style.background = "red";
+                    }
+                });
+            }
+            else if (message['user1']['is_round_winner'][last_index_win] === 1){
+                document.getElementById('id_user_make_choose').innerText = `${message['user1']['username']} win round`;
+                if (message['user1']['username'] === '{{ curent_user.username }}'){
+                    document.querySelectorAll('div#choose_player1').forEach(el => {
+                        if (el.dataset.thing === `${message['user1']['choice'][last_index_choice]}`){
+                            el.style.background = "green";
+                        }
+                    });
+                    document.querySelectorAll('div#choose_player2').forEach(el => {
+                        if (el.dataset.thing === `${message['user2']['choice'][last_index_choice]}`){
+                            el.style.background = "red";
+                        }
+                    });
+                }
+                else{
+                    document.querySelectorAll('div#choose_player1').forEach(el => {
+                        if (el.dataset.thing === `${message['user2']['choice'][last_index_choice]}`){
+                            el.style.background = "red";
+                        }
+                    });
+                    document.querySelectorAll('div#choose_player2').forEach(el => {
+                        if (el.dataset.thing === `${message['user1']['choice'][last_index_choice]}`){
+                            el.style.background = "green";
+                        }
+                    });
+                }
+            }
+            else if (message['user2']['is_round_winner'][last_index_win] === 1){
+                document.getElementById('id_user_make_choose').innerText = `${message['user2']['username']} win round`;
+                if (message['user2']['username'] === '{{ curent_user.username }}'){
+                    document.querySelectorAll('div#choose_player1').forEach(el => {
+                        if (el.dataset.thing === `${message['user2']['choice'][last_index_choice]}`){
+                            el.style.background = "green";
+                        }
+                    });
+                    document.querySelectorAll('div#choose_player2').forEach(el => {
+                        if (el.dataset.thing === `${message['user1']['choice'][last_index_choice]}`){
+                            el.style.background = "red";
+                        }
+                    });
+                }
+                else{
+                    document.querySelectorAll('div#choose_player1').forEach(el => {
+                        if (el.dataset.thing === `${message['user1']['choice'][last_index_choice]}`){
+                            el.style.background = "red";
+                        }
+                    });
+                    document.querySelectorAll('div#choose_player2').forEach(el => {
+                        if (el.dataset.thing === `${message['user2']['choice'][last_index_choice]}`){
+                            el.style.background = "green";
+                        }
+                    });
+                }
+             }
+        }
+
+        {#---------------end help functions---------------------#}
+        const data = JSON.parse(e.data);
+        let message = data['message'];
+        let round_number = message['user1']['choice'].length + 1;
+        let thing_dict = {
+            0: 'Not choosen',
+            1: 'Stone',
+            2: 'Scissors',
+            3: 'Paper',
+            4: 'Lizard',
+            5: 'Spok'
+        };
+        let round_winner_dict = {0: 'Fail',
+            1: 'Win' };
+        let user1_score = message['user1']['is_round_winner'].filter(x => x===1).length;
+        let user2_score = message['user2']['is_round_winner'].filter(x => x===1).length;
+        let last_index_choice = message['user1']['choice'].length - 1;
+        let last_index_win = message['user1']['is_round_winner'].length - 1;
+        if (message['winner']){
             if (message['winner'].length === 0){
                 {#    New Round#}
                 {#    Write users score and his choices  #}
-                {#    restart timer and reset one clicking for func ListenForClicking#}
-                document.getElementById('id_user_make_choose').innerText = ``;
-                round_number = message['user1']['choice'].length + 1;
-                document.getElementById('id_round').innerText = `Round ${round_number}`;
+                write_game_log_and_score(round_number, thing_dict, round_winner_dict,
+                    user1_score, user2_score, last_index_choice, last_index_win);
+                output_players_choice(message, last_index_win, last_index_choice);
 
-                thing_dict = {
-                    0: 'Not choosen',
-                    1: 'Stone',
-                    2: 'Scissors',
-                    3: 'Paper',
-                    4: 'Lizard',
-                    5: 'Spok'
-                };
-                round_winner_dict = {0: 'Fail',
-                    1: 'Win' };
-                user1_score = message['user1']['is_round_winner'].filter(x => x===1).length;
-                user2_score = message['user2']['is_round_winner'].filter(x => x===1).length;
-                last_index_choice = message['user1']['choice'].length - 1;
-                last_index_win = message['user1']['is_round_winner'].length - 1;
-                if (message['user1']['username'] === '{{ curent_user.username }}'){
-                    document.getElementById('left_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
-                    document.getElementById('right_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
-                    document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
-                        `<div class="row">${thing_dict[message['user1']['choice'][last_index_choice]]} : `
-                        +` ${round_winner_dict[message['user1']['is_round_winner'][last_index_choice]]}</div>`);
-                    document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
-                        `<div class="row">${thing_dict[message['user2']['choice'][last_index_win]]} : `
-                        +` ${round_winner_dict[message['user2']['is_round_winner'][last_index_win]]}</div>`);
-                }
-                else {
-                    document.getElementById('right_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
-                    document.getElementById('left_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
-                    document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
-                        `<div class="row">${thing_dict[message['user2']['choice'][last_index_choice]]} : `
-                        + `${round_winner_dict[message['user2']['is_round_winner'][last_index_choice]]}</div>`);
-                    document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
-                        `<div class="row">${thing_dict[message['user1']['choice'][last_index_win]]} : `
-                        + `${round_winner_dict[message['user1']['is_round_winner'][last_index_win]]}</div>`);
-                }
             }
             else {
-                {#    Show winner info in modal by 5 sec#}
-                $('#Modal').modal('show');
-                document.getElementById("modal-user-name").innerHTML = `<p>Winner data: ${message['winner']} </p>`;
-                setTimeout(function () {
-                    $('#Modal').modal('hide');
-                    GameSocket.close(1000, 'Game is over');
-                    window.location.href = '/'
-                }, 5000)
+                show_winner_info()
             }
-            document.querySelectorAll('div#choose_player1').forEach(el => {
-                el.style.background = "transparent";
-
-            });
+            setTimeout(reset_timer_clear_temp, 5000)
         }
         else {
             {#    Waiting for user2 choice#}
@@ -200,7 +292,7 @@
     $(document).one('click', '#choose_player1', listenForClicking);
     function listenForClicking(){
         let thing = $(this).data('thing');
-        document.querySelector(`[data-thing="${thing}"]`).style.background = 'red';
+        document.querySelector(`[data-thing="${thing}"]`).style.background = '#c0c0c0';
         GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':thing}));
         is_choosen = true
     }

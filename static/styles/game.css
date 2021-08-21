@@ -13,3 +13,8 @@
     opacity: 0.5;
     align-content: center;
 }
+
+#id_image {
+    max-height: 100px;
+    max-width: 100px
+}
