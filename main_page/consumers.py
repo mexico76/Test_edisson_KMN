@@ -128,7 +128,7 @@ class GameConsumer(AsyncWebsocketConsumer):
     GAME_DICT = {
         'user1': {'username': '', 'choice': [], 'is_round_winner': []},
         'user2': {'username': '', 'choice': [], 'is_round_winner': []},
-        'winner': []
+        'winner': ''
     }
     @database_sync_to_async
     def __change_busy_status(self, status: bool = False):
@@ -139,7 +139,27 @@ class GameConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def __get_winner_data(self, username):
         user = User.objects.filter(username=username).first()
-        return [user.username, user.first_name, user.last_name]
+        return f'Username - {user.username}, firstname - {user.first_name}, lastname - {user.last_name}.'
+
+    async def __if_user_disconnect(self):
+        game_dict = json.loads(cache.get(self.user_names_key))
+        disconnected_user = self.scope['user']
+        if len(game_dict['winner']) == 0:
+            if disconnected_user.username == self.user1:
+                winner_data = await self.__get_winner_data(self.user2)
+                game_dict['winner'] = winner_data
+            else:
+                winner_data = await self.__get_winner_data(game_dict['user1']['username'])
+                game_dict['winner'] = winner_data + (f' \n{disconnected_user} was disconnected! ')
+            cache.set(self.user_names_key, json.dumps(game_dict))
+            message = game_dict
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'game_message',
+                    'message': message
+                }
+            )
 
     async def connect(self):
         default_dict = {
@@ -164,8 +184,8 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         # Leave room group
+        await self.__if_user_disconnect()
         await self.__change_busy_status(False)
-        # print('GAME_DICT: ', game_dict)
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name,
@@ -179,13 +199,12 @@ class GameConsumer(AsyncWebsocketConsumer):
         game_dict = json.loads(cache.get(self.user_names_key))
         user = text_data['user'] # curent user
         choice = text_data['choice']
-        print(user, choice)
-        if game_dict['winner'] == []:
+        if len(game_dict['winner']) == 0:
+            '''add Choices of both players'''
             if user == game_dict['user1']['username'] :
                 game_dict['user1']['choice'].append((choice))
             elif user == game_dict['user2']['username']:
                 game_dict['user2']['choice'].append((choice))
-            print('one user make choice', game_dict)
             if len(game_dict['user1']['choice']) == len(game_dict['user2']['choice']):
                 '''both users make choice'''
                 if game_dict['user2']['choice'][-1] == game_dict['user1']['choice'][-1]:
@@ -218,10 +237,10 @@ class GameConsumer(AsyncWebsocketConsumer):
                 else:
                     message = {'make_choice': game_dict['user2']['username']}
         else:
-            '''Winner is allready exist'''
-            message = {'winner': game_dict['winner']}
+            '''winner is allready exist'''
+            game_dict = json.loads(cache.get(self.user_names_key))
+            message = game_dict
         cache.set(self.user_names_key, json.dumps(game_dict))
-        # print(message)
         # Send message to room group
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -238,9 +257,5 @@ class GameConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(
             {'message': message}
         ))
-    if disconnect:
-        GAME_DICT = {
-            'user1': {'username': '', 'choice': [], 'is_round_winner': []},
-            'user2': {'username': '', 'choice': [], 'is_round_winner': []},
-            'winner': []
-        }
+
+

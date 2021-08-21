@@ -90,7 +90,13 @@
     let is_choosen = false;
     setInterval(myTimer, 1000);
     let time = 30;
-
+     $(document).one('click', '#choose_player1', listenForClicking);
+    function listenForClicking(){
+        let thing = $(this).data('thing');
+        document.querySelector(`[data-thing="${thing}"]`).style.background = '#c0c0c0';
+        GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':thing}));
+        is_choosen = true
+    }
     function myTimer() {
         document.getElementById('id_timer').innerText = time;
         if (time === 0){
@@ -289,13 +295,5 @@
 
         }
     };
-    $(document).one('click', '#choose_player1', listenForClicking);
-    function listenForClicking(){
-        let thing = $(this).data('thing');
-        document.querySelector(`[data-thing="${thing}"]`).style.background = '#c0c0c0';
-        GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':thing}));
-        is_choosen = true
-    }
-
 </script>
 {% endblock %}
