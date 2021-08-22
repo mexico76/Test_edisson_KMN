@@ -147,7 +147,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         if len(game_dict['winner']) == 0:
             if disconnected_user.username == self.user1:
                 winner_data = await self.__get_winner_data(self.user2)
-                game_dict['winner'] = winner_data
+                game_dict['winner'] = winner_data + (f' \n{disconnected_user} was disconnected! ')
             else:
                 winner_data = await self.__get_winner_data(game_dict['user1']['username'])
                 game_dict['winner'] = winner_data + (f' \n{disconnected_user} was disconnected! ')
