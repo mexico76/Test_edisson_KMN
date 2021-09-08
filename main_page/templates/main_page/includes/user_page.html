@@ -33,14 +33,13 @@
             for (element in data) {
                 single_element = data[element];
                 let curent_user = "{{ user.username }}";
-                if (single_element['username'] == curent_user) {}
-                else if (single_element['is_busy']) {
+                if (single_element['username'] != curent_user & single_element['is_busy']){
                      users +=
                          '<div class="bg-danger col-sm-3 border text-dark">'
                          + single_element['username']
                          + ' - playing </div>'
                 }
-                else {
+                else if (single_element['username'] != curent_user & !(single_element['is_busy'])) {
                      users +=
                          '<a href="#AceptingGame" data-id='
                          + single_element['username']
@@ -130,7 +129,6 @@
             if (message['reject_user']) {
                 if (message['reject_user']['requester'] === '{{ user.username }}') {
                     let rejector = message['reject_user']['rejector'];
-                    let requester = message['reject_user']['requester'];
                     document.getElementById("modal-user-name").innerHTML = `<p>${rejector} don't want to play with You </p>`;
                     $('#Modal').on('hidden.bs.modal', function () {
                         $('body').removeClass('modal-open');

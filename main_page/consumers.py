@@ -1,84 +1,39 @@
 import json
-from channels.db import database_sync_to_async
+import jsons
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.exceptions import DenyConnection
-from django.contrib.auth.models import AnonymousUser, User
-from django.db.models import Q
+from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
+from asgiref.sync import async_to_sync
 
-from registration.models import Player
+
+from .services import WaitingRoom, PlayerGame, Game, create_game
 
 
 class WaitingRoomConsumer(AsyncWebsocketConsumer):
-    @database_sync_to_async
-    def __change_online_status(self, status:bool=False):
-        player = Player.objects.get(user=self.scope['user'])
-        player.is_online = status
-        player.save()
-
-    @database_sync_to_async
-    def __change_busy_status(self, status: bool = False):
-        player = Player.objects.get(user=self.scope['user'])
-        player.is_busy = status
-        player.save()
-
-    @database_sync_to_async
-    def __change_busy_status_both_player(self, user1, user2, status: bool = False):
-        player1 = Player.objects.get(user__username=user1)
-        player1.is_busy = status
-        player1.save()
-        player2 = Player.objects.get(user__username=user2)
-        player2.is_busy = status
-        player2.save()
-
-    @database_sync_to_async
-    def __get_user_list_online(self):
-        online_users = Player.objects.filter(Q(is_online=True) | Q(is_busy=True))
-        user_list = tuple(
-            {'username': user.user.username, 'id': user.user.pk, 'is_online': user.is_online, 'is_busy': user.is_busy}
-        for user in online_users)
-        return user_list
-
-    #------------------------------------------------------help functions
     async def connect(self):
-        await self.__change_busy_status(False)
+        self.player = PlayerGame(self.scope['user'])
+        self.waiting_room = WaitingRoom()
         self.room_group_name = 'waiting_room'
+        await self.player.change_busy_status(False)
         # Join room group
-        if self.scope['user'] == AnonymousUser():
+        if self.player.username == AnonymousUser():
             raise DenyConnection("User is not exist")
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name,
         )
-        await self.__change_online_status(True)
-        user_list = await self.__get_user_list_online()
+        await self.player.change_online_status(True)
+        user_list = await self.waiting_room.get_user_list_online()
         await self.receive({'user_list': user_list})
         await self.accept()
 
     async def receive(self, text_data=None, bytes_data=None):
-        if type(text_data)==str:
+        if type(text_data) == str:
             text_data = json.loads(text_data)
         message_dict = {}
-        if 'invite_user' in text_data.keys():
-            await self.__change_busy_status_both_player(text_data['invite_user']['requester'],
-                                                        text_data['invite_user']['receiver'], True)
-            message_dict['invite_user'] = {'requester': text_data['invite_user']['requester'],
-                                           'receiver': text_data['invite_user']['receiver']}
-        if 'reject_user' in text_data.keys():
-            await self.__change_busy_status_both_player(text_data['reject_user']['rejector'],
-                                                        text_data['reject_user']['requester'], False)
-            message_dict['reject_user'] = {'rejector': text_data['reject_user']['rejector'],
-                                           'requester': text_data['reject_user']['requester']}
-        if 'reject_from_requester' in text_data.keys():
-            await self.__change_busy_status_both_player(text_data['reject_from_requester']['receiver'],
-                                                        text_data['reject_from_requester']['requester'], False)
-            message_dict['reject_from_requester'] = {'receiver': text_data['reject_from_requester']['receiver'],
-                                           'requester': text_data['reject_from_requester']['requester']}
-        if 'agree_for_game_to_server' in text_data.keys():
-            message_dict['agree_for_game_to_server'] = {'requester': text_data['agree_for_game_to_server']['requester'],
-                                           'receiver': text_data['agree_for_game_to_server']['receiver']}
-
-        user_list = await self.__get_user_list_online()
+        message_dict = await self.waiting_room.invite_logic(text_data, message_dict)
+        user_list = await self.waiting_room.get_user_list_online()
         message_dict['user_list'] = user_list
         await self.channel_layer.group_send(
                 self.room_group_name,
@@ -98,8 +53,8 @@ class WaitingRoomConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         # Leave room group
-        await self.__change_online_status(False)
-        user_list = await self.__get_user_list_online()
+        await self.player.change_online_status(False)
+        user_list = await self.waiting_room.get_user_list_online()
         await self.receive({'user_list': user_list})
         await self.channel_layer.group_discard(
             self.room_group_name,
@@ -108,73 +63,19 @@ class WaitingRoomConsumer(AsyncWebsocketConsumer):
 
 class GameConsumer(AsyncWebsocketConsumer):
     '''Consumer for gaming'''
-
-    KMN_DICT = {
-        0: 'No Choice',
-        1: 'Stone',
-        2: 'Scissors',
-        3: 'Paper',
-        4: 'Lizard',
-        5: 'Spok'
-    }
-    KMN_WINER_DICT = {
-        0: [],
-        1: [2, 4, 0],
-        2: [3, 4, 0],
-        3: [1, 5, 0],
-        4: [3, 5, 0],
-        5: [1, 2, 0]
-    }
-    GAME_DICT = {
-        'user1': {'username': '', 'choice': [], 'is_round_winner': []},
-        'user2': {'username': '', 'choice': [], 'is_round_winner': []},
-        'winner': ''
-    }
-    @database_sync_to_async
-    def __change_busy_status(self, status: bool = False):
-        player = Player.objects.get(user=self.scope['user'])
-        player.is_busy = status
-        player.save()
-
-    @database_sync_to_async
-    def __get_winner_data(self, username):
-        user = User.objects.filter(username=username).first()
-        return f'Username - {user.username}, firstname - {user.first_name}, lastname - {user.last_name}.'
-
-    async def __if_user_disconnect(self):
-        game_dict = json.loads(cache.get(self.user_names_key))
-        disconnected_user = self.scope['user']
-        if len(game_dict['winner']) == 0:
-            if disconnected_user.username == self.user1:
-                winner_data = await self.__get_winner_data(self.user2)
-                game_dict['winner'] = winner_data + (f' \n{disconnected_user} was disconnected! ')
-            else:
-                winner_data = await self.__get_winner_data(game_dict['user1']['username'])
-                game_dict['winner'] = winner_data + (f' \n{disconnected_user} was disconnected! ')
-            cache.set(self.user_names_key, json.dumps(game_dict))
-            message = game_dict
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'game_message',
-                    'message': message
-                }
-            )
-
     async def connect(self):
-        default_dict = {
-            'user1': {'username': '', 'choice': [], 'is_round_winner': []},
-            'user2': {'username': '', 'choice': [], 'is_round_winner': []},
-            'winner': []
-        }
-        self.user1 = self.scope['url_route']['kwargs']['user1']
-        self.user2 = self.scope['url_route']['kwargs']['user2']
-        self.user_names_key = str(self.user1 + '-' + self.user2)
-        self.room_group_name = f'game-{self.user1}-{self.user2}'
-        default_dict['user1']['username'] = self.user1
-        default_dict['user2']['username'] = self.user2
-        json_def_dict = json.dumps(default_dict)
-        cache.set(self.user_names_key, json_def_dict)
+        self.player = PlayerGame(self.scope['user'])
+        self.user_names_key = str(self.scope['url_route']['kwargs']['user1'] + '-' + self.scope['url_route']['kwargs']['user2'])
+        # if not cache.get(self.user_names_key):
+        #     self.new_game = Game(self.scope['url_route']['kwargs']['user1'], self.scope['url_route']['kwargs']['user2'])
+        #     await serialize_and_put_to_cache(self.user_names_key, self.new_game)
+        # else:
+        #     self.new_game = await deserialize_and_get_from_cache(self.user_names_key, Game)
+        # print(self.new_game)
+        '''Необходимо при коннекте первого пользователя создавать экземпляр Game, а следующий только будет к нему
+         обращаться. Либо проверять создан ли экземпляр в кэше и если нет то создавать его и записывать в кэш'''
+        self.new_game = Game(self.scope['url_route']['kwargs']['user1'], self.scope['url_route']['kwargs']['user2'])
+        self.room_group_name = f'game-{self.new_game.player1.username}-{self.new_game.player2.username}'
         # Join room group
         await self.channel_layer.group_add(
             self.room_group_name,
@@ -184,63 +85,53 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         # Leave room group
-        await self.__if_user_disconnect()
-        await self.__change_busy_status(False)
+        disconnect_info = await self.new_game.if_user_disconnect(self.scope['user'])
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'game_message',
+                'message': disconnect_info
+            }
+        )
+        await self.player.change_busy_status(False)
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name,
-
         )
 
     # Receive message from WebSocket
     async def receive(self, text_data):
-        if type(text_data)==str:
+        if type(text_data) == str:
             text_data = json.loads(text_data)
-        game_dict = json.loads(cache.get(self.user_names_key))
         user = text_data['user'] # curent user
         choice = text_data['choice']
-        if len(game_dict['winner']) == 0:
-            '''add Choices of both players'''
-            if user == game_dict['user1']['username'] :
-                game_dict['user1']['choice'].append((choice))
-            elif user == game_dict['user2']['username']:
-                game_dict['user2']['choice'].append((choice))
-            if len(game_dict['user1']['choice']) == len(game_dict['user2']['choice']):
-                '''both users make choice'''
-                if game_dict['user2']['choice'][-1] == game_dict['user1']['choice'][-1]:
-                    '''no one winner'''
-                    game_dict['user1']['is_round_winner'].append(0)
-                    game_dict['user2']['is_round_winner'].append(0)
-                elif (game_dict['user2']['choice'][-1] != game_dict['user1']['choice'][-1]) and\
-                        (game_dict['user2']['choice'][-1] in self.KMN_WINER_DICT[game_dict['user1']['choice'][-1]]):
-                    '''User1 is winner in round'''
-                    game_dict['user1']['is_round_winner'].append(1)
-                    game_dict['user2']['is_round_winner'].append(0)
-                elif (game_dict['user2']['choice'][-1] != game_dict['user1']['choice'][-1]) and\
-                        (game_dict['user1']['choice'][-1] in self.KMN_WINER_DICT[game_dict['user2']['choice'][-1]]):
-                    '''user2 is winner round'''
-                    game_dict['user1']['is_round_winner'].append(0)
-                    game_dict['user2']['is_round_winner'].append(1)
-                if game_dict['user1']['is_round_winner'].count(1) >= 5:
-                    '''Total winner User1'''
-                    winner_data = await self.__get_winner_data(game_dict['user1']['username'])
-                    game_dict['winner'] = winner_data
-                elif game_dict['user2']['is_round_winner'].count(1) >= 5:
-                    '''Total Winner User2'''
-                    winner_data = await self.__get_winner_data(game_dict['user2']['username'])
-                    game_dict['winner'] = winner_data
-                message = game_dict
-            else:
-                '''Only one user make choice'''
-                if len(game_dict['user1']['choice']) > len(game_dict['user2']['choice']):
-                    message = {'make_choice': game_dict['user1']['username']}
-                else:
-                    message = {'make_choice': game_dict['user2']['username']}
+        await self.new_game.add_user_choice(user, choice)
+        if not self.new_game.winner_data and len(self.new_game.player1.choices) == len(self.new_game.player2.choices):
+            '''both users make choice'''
+            if self.new_game.player1.choices[-1] == self.new_game.player2.choices[-1]:
+                '''no one winner'''
+            elif (self.new_game.player1.choices[-1] != self.new_game.player2.choices[-1]) and \
+                (self.new_game.player2.choices[-1] in self.new_game.KMN_WINER_DICT[self.new_game.player1.choices[-1]]):
+                '''User1 is winner in round'''
+                self.new_game.player1_score += 1
+            elif (self.new_game.player1.choices[-1] != self.new_game.player2.choices[-1]) and \
+                (self.new_game.player1.choices[-1] in self.new_game.KMN_WINER_DICT[self.new_game.player2.choices[-1]]):
+                '''user2 is winner round'''
+                self.new_game.player2_score += 1
+            if self.new_game.player1_score >= 5:
+                '''Total winner User1'''
+                self.new_game.winner_data = await self.new_game.get_winner_data(self.new_game.player1.username)
+            elif self.new_game.player2_score >= 5:
+                '''Total Winner User2'''
+                self.new_game.winner_data = await self.new_game.get_winner_data(self.new_game.player2.username)
+            message = jsons.dump(self.new_game)
+        elif not self.new_game.winner_data and len(self.new_game.player1.choices) != len(self.new_game.player2.choices):
+            '''Only one user make choice'''
+            message = {'make_choice': user}
         else:
             '''winner is allready exist'''
-            game_dict = json.loads(cache.get(self.user_names_key))
-            message = game_dict
-        cache.set(self.user_names_key, json.dumps(game_dict))
+            message = jsons.dump(self.new_game)
+        print(message)
         # Send message to room group
         await self.channel_layer.group_send(
             self.room_group_name,
