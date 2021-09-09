@@ -112,3 +112,15 @@ class Game:
             self.player1.make_choice(choice)
         else:
             self.player2.make_choice(choice)
+
+
+async def serialize_and_put_to_cache(key, object):
+    dumped = jsons.dump(object)
+    print(dumped)
+    cache.set(key, dumped)
+
+
+async def deserialize_and_get_from_cache(key, class_inst):
+    dumped = cache.get(key)
+    instance =jsons.load(dumped, class_inst)
+    return instance
