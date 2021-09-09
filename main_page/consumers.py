@@ -7,7 +7,8 @@ from django.core.cache import cache
 from asgiref.sync import async_to_sync
 
 
-from .services import WaitingRoom, PlayerGame, Game, create_game
+from .services import WaitingRoom, PlayerGame, Game, create_game, serialize_and_put_to_cache, \
+    deserialize_and_get_from_cache
 
 
 class WaitingRoomConsumer(AsyncWebsocketConsumer):
@@ -66,15 +67,15 @@ class GameConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.player = PlayerGame(self.scope['user'])
         self.user_names_key = str(self.scope['url_route']['kwargs']['user1'] + '-' + self.scope['url_route']['kwargs']['user2'])
-        # if not cache.get(self.user_names_key):
-        #     self.new_game = Game(self.scope['url_route']['kwargs']['user1'], self.scope['url_route']['kwargs']['user2'])
-        #     await serialize_and_put_to_cache(self.user_names_key, self.new_game)
-        # else:
-        #     self.new_game = await deserialize_and_get_from_cache(self.user_names_key, Game)
-        # print(self.new_game)
+        if not cache.get(self.user_names_key):
+            self.new_game = Game(self.scope['url_route']['kwargs']['user1'], self.scope['url_route']['kwargs']['user2'])
+            await serialize_and_put_to_cache(self.user_names_key, self.new_game)
+        else:
+            self.new_game = await deserialize_and_get_from_cache(self.user_names_key, Game)
+        print(self.new_game)
         '''Необходимо при коннекте первого пользователя создавать экземпляр Game, а следующий только будет к нему
          обращаться. Либо проверять создан ли экземпляр в кэше и если нет то создавать его и записывать в кэш'''
-        self.new_game = Game(self.scope['url_route']['kwargs']['user1'], self.scope['url_route']['kwargs']['user2'])
+        # self.new_game = Game(self.scope['url_route']['kwargs']['user1'], self.scope['url_route']['kwargs']['user2'])
         self.room_group_name = f'game-{self.new_game.player1.username}-{self.new_game.player2.username}'
         # Join room group
         await self.channel_layer.group_add(
