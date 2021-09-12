@@ -87,30 +87,141 @@
 
 {% block javascript %}
 <script>
-    var is_choosen = false;
+    class GameLogic {
+        colors = {
+            0: 'red',
+            1: 'green'
+        };
+        thing_dict = {
+            0: 'Not choosen',
+            1: 'Stone',
+            2: 'Scissors',
+            3: 'Paper',
+            4: 'Lizard',
+            5: 'Spok'
+        };
+        round_winner_dict = {
+            0: 'Fail',
+            1: 'Win'
+        };
+
+        reset_timer_clear_temp() {
+            setTimeout(function () {
+                {#Clear temp data#}
+                document.getElementById('id_user_make_choose').innerText = ``;
+                document.querySelectorAll('div#choose_player1').forEach(el => {
+                    el.style.background = "transparent";
+                });
+                document.querySelectorAll('div#choose_player2').forEach(el => {
+                    el.style.background = "transparent";
+                });
+                {#Reset timer and one click event#}
+                if (is_choosen) {
+                    $(document).one('click', '#choose_player1', listenForClicking);
+                }
+                is_choosen = false;
+                time = 30;
+            }, 5000);
+        }
+
+        game_log_and_score_for_all(user1, user2, round_number, user1_score, user2_score, user1_choice, user2_choice,
+                                   user1_is_win, user2_is_win) {
+            document.getElementById('left_score').innerHTML = `<h3>${user1}</h3><br><h1>${user1_score}</h1>`;
+            document.getElementById('right_score').innerHTML = `<h3>${user2}</h3><br><h1>${user2_score}</h1>`;
+            document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
+                `<div class="row">${this.thing_dict[user1_choice]} : `
+                + ` ${this.round_winner_dict[user1_is_win]}</div>`);
+            document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
+                `<div class="row">${this.thing_dict[user2_choice]} : `
+                + ` ${this.round_winner_dict[user2_is_win]}</div>`);
+        }
+
+        write_game_log_and_score(user1, user2, round_number, user1_score, user2_score, user1_choice, user2_choice,
+                                 user1_is_win, user2_is_win) {
+            document.getElementById('id_round').innerText = `Round ${round_number}`;
+            if (user1 === '{{ curent_user.username }}') {
+                this.game_log_and_score_for_all(user1, user2, round_number, user1_score, user2_score,
+                    user1_choice, user2_choice, user1_is_win, user2_is_win)
+            } else {
+                this.game_log_and_score_for_all(user2, user1, round_number, user2_score, user1_score,
+                    user2_choice, user1_choice, user2_is_win, user1_is_win)
+            }
+        }
+
+        show_winner_info(winner) {
+            {#    Show winner info in modal by 5 sec#}
+            $('#Modal').modal('show');
+            document.getElementById("modal-user-name").innerHTML = `<p>Winner data: ${winner} </p>`;
+            setTimeout(function () {
+                $('#Modal').modal('hide');
+                GameSocket.close(1000, 'Game is over');
+                window.location.href = '/'
+            }, 5000)
+        }
+
+        color_choice(choice, is_win, player_position) {
+            document.querySelectorAll(`div#choose_player${player_position}`).forEach(el => {
+                if (el.dataset.thing === `${choice}`) {
+                    el.style.background = this.colors[is_win];
+                }
+            });
+        }
+
+        output_players_choice(user1, user2, user_1_choice, user_2_choice, user_1_is_win, user_2_is_win) {
+            if (user1 === '{{ curent_user.username }}') {
+                var user1_name = user1;
+                var user2_name = user2;
+                var user1_last_choice = user_1_choice;
+                var user2_last_choice = user_2_choice;
+                var user1_is_win = user_1_is_win;
+                var user2_is_win = user_2_is_win;
+            } else {
+                var user1_name = user2;
+                var user2_name = user1;
+                var user1_last_choice = user_2_choice;
+                var user2_last_choice = user_1_choice;
+                var user1_is_win = user_2_is_win;
+                var user2_is_win = user_1_is_win;
+            }
+            {#Output Chooses of players#}
+            if (user1_is_win === user2_is_win) {
+                document.getElementById('id_user_make_choose').innerText = `No one player win round`;
+                this.color_choice(user1_last_choice, user1_is_win, 1);
+                this.color_choice(user2_last_choice, user2_is_win, 2)
+            } else {
+                if (user1_is_win) {
+                    document.getElementById('id_user_make_choose').innerText = `${user1_name} win round`;
+                } else {
+                    document.getElementById('id_user_make_choose').innerText = `${user2_name} win round`;
+                }
+                this.color_choice(user1_last_choice, user1_is_win, 1);
+                this.color_choice(user2_last_choice, user2_is_win, 2)
+            }
+        }
+    }
+
+    let is_choosen = false;
     setInterval(myTimer, 1000);
-    var time = 30;
-     $(document).one('click', '#choose_player1', listenForClicking);
-    function listenForClicking(){
-        var thing = $(this).data('thing');
+    let time = 30;
+    $(document).one('click', '#choose_player1', listenForClicking);
+
+    function listenForClicking() {
+        let thing = $(this).data('thing');
         document.querySelector(`[data-thing="${thing}"]`).style.background = '#c0c0c0';
-        GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':thing}));
+        GameSocket.send(JSON.stringify({'user': '{{curent_user}}', 'choice': thing}));
         is_choosen = true
     }
+
     function myTimer() {
         document.getElementById('id_timer').innerText = time;
-        if (time === 0){
-            {#clearInterval(myTimer)#}
-            GameSocket.send(JSON.stringify({'user':'{{curent_user}}', 'choice':0}));
+        if (time === 0) {
+            clearInterval(myTimer)
+            GameSocket.send(JSON.stringify({'user': '{{curent_user}}', 'choice': 0}));
             time = -1
-        }
-        else{
-            if (is_choosen === true){
-                clearInterval(myTimer);
-            }
-            else{
-                --time
-            }
+        } else if (is_choosen === true) {
+            clearInterval(myTimer);
+        } else {
+            --time
         }
     }
 
@@ -129,148 +240,38 @@
         console.log('socket is cloced');
     };
 
+
     GameSocket.onmessage = function (e) {
-
-        var colors = {
-                0: 'red',
-                1: 'green'
-            };
-        {#--------------help functions----------------#}
-        function reset_timer_clear_temp () {
-            {#Clear temp data#}
-            document.getElementById('id_user_make_choose').innerText = ``;
-            document.querySelectorAll('div#choose_player1').forEach(el => {
-                el.style.background = "transparent";
-            });
-            document.querySelectorAll('div#choose_player2').forEach(el => {
-                el.style.background = "transparent";
-            });
-            {#Reset timer and one click event#}
-            if (is_choosen){
-                $(document).one('click', '#choose_player1', listenForClicking);
-             }
-            is_choosen = false;
-            time = 30;
-        }
-        function write_game_log_and_score(round_number, thing_dict, round_winner_dict, user1_score,
-                                          user2_score, last_index_choice, last_index_win) {
-            document.getElementById('id_round').innerText = `Round ${round_number}`;
-            if (message['user1']['username'] === '{{ curent_user.username }}'){
-                document.getElementById('left_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
-                document.getElementById('right_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
-                document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
-                    `<div class="row">${thing_dict[message['user1']['choice'][last_index_choice]]} : `
-                    +` ${round_winner_dict[message['user1']['is_round_winner'][last_index_choice]]}</div>`);
-                document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
-                    `<div class="row">${thing_dict[message['user2']['choice'][last_index_win]]} : `
-                    +` ${round_winner_dict[message['user2']['is_round_winner'][last_index_win]]}</div>`);
-            }
-            else {
-                document.getElementById('right_score').innerHTML = `<h3>${message['user1']['username']}</h3><br><h1>${user1_score}</h1>`;
-                document.getElementById('left_score').innerHTML = `<h3>${message['user2']['username']}</h3><br><h1>${user2_score}</h1>`;
-                document.getElementById('left_log').insertAdjacentHTML('beforeEnd',
-                    `<div class="row">${thing_dict[message['user2']['choice'][last_index_choice]]} : `
-                    + `${round_winner_dict[message['user2']['is_round_winner'][last_index_choice]]}</div>`);
-                document.getElementById('right_log').insertAdjacentHTML('beforeEnd',
-                    `<div class="row">${thing_dict[message['user1']['choice'][last_index_win]]} : `
-                    + `${round_winner_dict[message['user1']['is_round_winner'][last_index_win]]}</div>`);
-            }
-        }
-
-        function show_winner_info() {
-            {#    Show winner info in modal by 5 sec#}
-            $('#Modal').modal('show');
-            document.getElementById("modal-user-name").innerHTML = `<p>Winner data: ${message['winner']} </p>`;
-            setTimeout(function () {
-                $('#Modal').modal('hide');
-                GameSocket.close(1000, 'Game is over');
-                window.location.href = '/'
-            }, 5000)
-        }
-
-        function color_choice(choice, is_win, player_position) {
-            document.querySelectorAll(`div#choose_player${player_position}`).forEach(el => {
-                if (el.dataset.thing === `${choice}`){
-                    el.style.background = colors[is_win];
-                 }
-            });
-        }
-
-        function output_players_choice(message, last_index_win, last_index_choice) {
-            if (message['user1']['username'] === '{{ curent_user.username }}'){
-                var user1_name = message['user1']['username'];
-                var user2_name = message['user2']['username'];
-                var user1_last_choice = message['user1']['choice'][last_index_choice];
-                var user2_last_choice = message['user2']['choice'][last_index_choice];
-                var user1_is_win = message['user1']['is_round_winner'][last_index_win];
-                var user2_is_win = message['user2']['is_round_winner'][last_index_win];
-            }
-            else{
-                var user2_name = message['user1']['username'];
-                var user1_name = message['user2']['username'];
-                var user2_last_choice = message['user1']['choice'][last_index_choice];
-                var user1_last_choice = message['user2']['choice'][last_index_choice];
-                var user2_is_win = message['user1']['is_round_winner'][last_index_win];
-                var user1_is_win = message['user2']['is_round_winner'][last_index_win];
-            }
-            {#Output Chooses of players#}
-            if (user1_is_win === user2_is_win){
-                document.getElementById('id_user_make_choose').innerText = `No one player win round`;
-                color_choice(user1_last_choice, user1_is_win, 1);
-                color_choice(user2_last_choice, user2_is_win, 2)
-            }
-            else {
-                if (user1_is_win){
-                    document.getElementById('id_user_make_choose').innerText = `${user1_name} win round`;
-                }
-                else {
-                    document.getElementById('id_user_make_choose').innerText = `${user2_name} win round`;
-                }
-                color_choice(user1_last_choice, user1_is_win, 1);
-                color_choice(user2_last_choice, user2_is_win, 2)
-            }
-        }
-
-        {#---------------end help functions---------------------#}
+        let game = new GameLogic()
         const data = JSON.parse(e.data);
-        console.log(data['message'])
-        var message = data['message'];
-        var thing_dict = {
-            0: 'Not choosen',
-            1: 'Stone',
-            2: 'Scissors',
-            3: 'Paper',
-            4: 'Lizard',
-            5: 'Spok'
-        };
-        var round_winner_dict = {
-            0: 'Fail',
-            1: 'Win'
-        };
-        console.log(message)
-        if (message['winner']){
-            var round_number = message['user1']['choice'].length + 1;
-            var user1_score = message['user1']['is_round_winner'].filter(x => x===1).length;
-            var user2_score = message['user2']['is_round_winner'].filter(x => x===1).length;
-            var last_index_choice = message['user1']['choice'].length - 1;
-            var last_index_win = message['user1']['is_round_winner'].length - 1;
-            if (message['winner'].length === 0){
+        let message = data['message'];
+        if ('winner' in message) {
+            try {
+                var round_number = message['round_number'];
+                var user1_score = message['user1']['score'];
+                var user2_score = message['user2']['score'];
+                var user1_choice = message['user1']['choice'];
+                var user2_choice = message['user2']['choice'];
+                var user1_is_win = message['user1']['is_round_winner'];
+                var user2_is_win = message['user2']['is_round_winner'];
+            } catch (e) {
+                console.log(`Can't read users choices, somebody is win. ${e}`)
+            }
+            if (message['winner'] === '') {
                 {#    New Round#}
                 {#    Write users score and his choices  #}
-                write_game_log_and_score(round_number, thing_dict, round_winner_dict,
-                    user1_score, user2_score, last_index_choice, last_index_win);
-                output_players_choice(message, last_index_win, last_index_choice);
-
+                game.write_game_log_and_score(message['user1']['username'], message['user2']['username'],
+                    round_number, user1_score, user2_score, user1_choice, user2_choice, user1_is_win, user2_is_win);
+                game.output_players_choice(message['user1']['username'], message['user2']['username'], user1_choice,
+                    user2_choice, user1_is_win, user2_is_win);
+            } else {
+                console.log('winner is exist')
+                game.show_winner_info(message['winner'])
             }
-            else {
-                show_winner_info()
-            }
-            setTimeout(reset_timer_clear_temp, 5000)
-        }
-        else if (message['make_choice']) {
-            console.log('Some user make choice')
+            game.reset_timer_clear_temp()
+        } else if ('make_choice' in message) {
             {#    Waiting for user2 choice#}
-            if (message['make_choice'] !== "{{ curent_user.username }}"){
+            if (message['make_choice'] !== "{{ curent_user.username }}") {
                 document.getElementById('id_user_make_choose').innerText = `User "${message['make_choice']}" makes his choice`
             }
         }

@@ -1,9 +1,9 @@
-import jsons
+import pickle
+
 from channels.db import database_sync_to_async
-from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.db.models import Q
-from django_redis import cache
+from django.core.cache import cache
 
 from registration.models import Player
 
@@ -71,11 +71,14 @@ class PlayerGame:
 
 class Game:
     def __init__(self, user1, user2):
+        self.round_number = 1
         self.player1 = PlayerGame(user1)
         self.player2 = PlayerGame(user2)
+        self.player1_is_round_win = []
+        self.player2_is_round_win = []
         self.player1_score = 0
         self.player2_score = 0
-        self.winner_data = None
+        self.winner_data = ''
         self.KMN_DICT = {
             0: 'No Choice',
             1: 'Stone',
@@ -105,7 +108,7 @@ class Game:
         else:
             winner_data = await self.get_winner_data(self.player1.username)
             self.winner_data = winner_data + (f' \n{self.player2.username} was disconnected! ')
-        return self
+        return {'winner': self.winner_data}
 
     async def add_user_choice(self, username, choice):
         if username == self.player1.username:
@@ -113,14 +116,60 @@ class Game:
         else:
             self.player2.make_choice(choice)
 
+    async def is_some_winner(self):
+        if self.player1_score >= 5:
+            '''Total winner User1'''
+            self.winner_data = await self.get_winner_data(self.player1.username)
+        elif self.player2_score >= 5:
+            '''Total Winner User2'''
+            self.winner_data = await self.get_winner_data(self.player2.username)
+
+    async def is_round_winner(self):
+        if self.player1.choices[-1] == self.player2.choices[-1]:
+            '''no one winner'''
+            self.player1_is_round_win.append(0)
+            self.player2_is_round_win.append(0)
+        elif (self.player1.choices[-1] != self.player2.choices[-1]) and \
+                (self.player2.choices[-1] in self.KMN_WINER_DICT[self.player1.choices[-1]]):
+            '''User1 is winner in round'''
+            self.player1_score += 1
+            self.player1_is_round_win.append(1)
+            self.player2_is_round_win.append(0)
+        elif (self.player1.choices[-1] != self.player2.choices[-1]) and \
+                (self.player1.choices[-1] in self.KMN_WINER_DICT[self.player2.choices[-1]]):
+            '''user2 is winner round'''
+            self.player2_score += 1
+            self.player1_is_round_win.append(0)
+            self.player2_is_round_win.append(1)
+        self.round_number += 1
+
+    async def check_if_user_make_choice_or_win_round_or_win_game(self, user):
+        if not self.winner_data and len(self.player1.choices) == len(self.player2.choices):
+            '''both users make choice'''
+            await self.is_round_winner()
+            await self.is_some_winner()
+            message = {
+            'round_number' : self.round_number,
+            'user1': {'username': self.player1.username, 'choice': self.player1.choices[-1],
+                      'is_round_winner': self.player1_is_round_win[-1], 'score': self.player1_score},
+            'user2': {'username': self.player2.username, 'choice': self.player2.choices[-1],
+                      'is_round_winner': self.player2_is_round_win[-1], 'score': self.player2_score},
+            'winner': self.winner_data}
+        elif not self.winner_data and len(self.player1.choices) != len(self.player2.choices):
+            '''Only one user make choice'''
+            message = {'make_choice': user}
+        else:
+            '''winner is allready exist'''
+            message = {'winner': self.winner_data}
+        return message
+
 
 async def serialize_and_put_to_cache(key, object):
-    dumped = jsons.dump(object)
-    print(dumped)
+    dumped = pickle.dumps(object)
     cache.set(key, dumped)
 
 
-async def deserialize_and_get_from_cache(key, class_inst):
+async def deserialize_and_get_from_cache(key):
     dumped = cache.get(key)
-    instance =jsons.load(dumped, class_inst)
+    instance =pickle.loads(dumped)
     return instance

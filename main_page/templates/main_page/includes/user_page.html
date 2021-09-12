@@ -28,10 +28,11 @@
 
 {% block javascript %}
     <script>
-        function render_user_list(data) {
+    class WaitingRoomLogic{
+        render_user_list(data) {
             let users = '';
-            for (element in data) {
-                single_element = data[element];
+            for (let element in data) {
+                let single_element = data[element];
                 let curent_user = "{{ user.username }}";
                 if (single_element['username'] != curent_user & single_element['is_busy']){
                      users +=
@@ -50,26 +51,78 @@
                          + '</a>'
                 }
             }
-            return users
+            document.querySelector('#id_user_list').innerHTML = (users);
         }
 
-        function send_request_for_game_to_server (requester, receiver) {
+        send_request_for_game_to_server (requester, receiver) {
             return {'invite_user': {'requester': requester, 'receiver': receiver}}
         }
-        function send_reject_for_game_to_server (rejector, requester) {
+        send_reject_for_game_to_server (rejector, requester) {
             return {'reject_user': {'rejector': rejector, 'requester': requester}}
         }
-        function send_reject_from_requester(requester, receiver) {
+        send_reject_from_requester(requester, receiver) {
             return {'reject_from_requester': {'requester': requester, 'receiver': receiver}}
         }
-        function send_agree_for_game_to_server(requester, receiver) {
+        send_agree_for_game_to_server(requester, receiver) {
             return {'agree_for_game_to_server':{'requester': requester, 'receiver': receiver}}
         }
-        function agree_function(requester, receiver) {
-            let agree_dict = send_agree_for_game_to_server(requester, receiver);
+        agree_function(requester, receiver) {
+            let agree_dict = this.send_agree_for_game_to_server(requester, receiver);
             WaitingRoomSocket.send(JSON.stringify(agree_dict))
         }
-{#-----------------------------------------------------#}
+        agree_for_game_to_server(message){
+            if (message['requester'] === '{{ user.username }}' ||
+                message['receiver'] === '{{ user.username }}'){
+                    window.location.href = `/game/${message['requester']}-${message['receiver']}`;
+            }
+        }
+        make_invite(message){
+            if (message['receiver'] === '{{ user.username }}') {
+                    $('#Modal').modal('show');
+                    let receiver = message['receiver']
+                    let requester = message['requester']
+                    document.getElementById("modal-user-name").innerHTML = `<p>${requester} want to play with You </p>`;
+                    document.getElementById("id_modal_footer").innerHTML =
+                        `<button type="button" class="btn btn-primary" data-dismiss="modal"
+                        onclick="waiting_room_logic.agree_function('${requester}', '${receiver}')">Agree</button>
+                        <button type="button" class="btn btn-secondary" id="id_cancel_button" data-dismiss="modal">Cancel</button>`
+                    $('#Modal').on('hidden.bs.modal', function () {
+                        $('body').removeClass('modal-open');
+                        $('.modal-backdrop').remove();
+                        let reject_dict = waiting_room_logic.send_reject_for_game_to_server(receiver, requester);
+                        WaitingRoomSocket.send(JSON.stringify(reject_dict))
+                    })
+                }
+            if (message['requester'] === '{{ user.username }}'){
+                $('#Modal').on('hide.bs.modal', function () {
+                    let reject_dict = waiting_room_logic.send_reject_from_requester('{{ user.username }}',
+                        message['receiver']);
+                    WaitingRoomSocket.send(JSON.stringify(reject_dict))
+                    $('body').removeClass('modal-open');
+                    $('.modal-backdrop').remove();
+                })
+             }
+        }
+        reject_from_receiver(message){
+            if (message['requester'] === '{{ user.username }}') {
+                let rejector = message['rejector'];
+                document.getElementById("modal-user-name").innerHTML = `<p>${rejector} don't want to play with You </p>`;
+                $('#Modal').on('hidden.bs.modal', function () {
+                    $('body').removeClass('modal-open');
+                    $('.modal-backdrop').remove();
+                })
+            }
+        }
+        reject_from_requester(message){
+            if (message['receiver'] === '{{ user.username }}') {
+                document.getElementById("modal-user-name").innerHTML = `<p>O-ops, He is not(</p>`;
+                document.getElementById("id_modal_footer").innerHTML =
+                    `<button type="button" class="btn btn-secondary" id="id_cancel_button"
+                    data-dismiss="modal">Cancel</button>`
+            }
+        }
+    }
+    let waiting_room_logic = new WaitingRoomLogic();
 
         const WaitingRoomSocket = new WebSocket(
             'ws://'
@@ -83,70 +136,30 @@
 
         WaitingRoomSocket.onclose = function (e) {
             console.log('User is offline');
-        };
-
+         };
 
         WaitingRoomSocket.onmessage = function(e) {
             const data = JSON.parse(e.data);
             let message = data['message']
             {#Building user_list in page#}
-            if (message['user_list']) {
-                let online_users = render_user_list(message['user_list']);
-                document.querySelector('#id_user_list').innerHTML = (online_users);
+            if ('user_list' in message) {
+                waiting_room_logic.render_user_list(message['user_list']);
             }
-            if (message['agree_for_game_to_server']) {
-                if (message['agree_for_game_to_server']['requester'] === '{{ user.username }}' ||
-                message['agree_for_game_to_server']['receiver'] === '{{ user.username }}'){
-                    window.location.href = `/game/${message['agree_for_game_to_server']['requester']}-${message['agree_for_game_to_server']['receiver']}`;
-                }
+            {#Handling acepting and rejecting#}
+            if ('agree_for_game_to_server' in message) {
+                waiting_room_logic.agree_for_game_to_server(message['agree_for_game_to_server']);
             }
-            if (message['invite_user']) {
-                if (message['invite_user']['receiver'] === '{{ user.username }}') {
-                    $('#Modal').modal('show');
-                    let receiver = message['invite_user']['receiver']
-                    let requester = message['invite_user']['requester']
-                    document.getElementById("modal-user-name").innerHTML = `<p>${requester} want to play with You </p>`;
-                    document.getElementById("id_modal_footer").innerHTML =
-                        `<button type="button" class="btn btn-primary" data-dismiss="modal"
-                        onclick="agree_function('${requester}', '${receiver}')">Agree</button>
-                        <button type="button" class="btn btn-secondary" id="id_cancel_button" data-dismiss="modal">Cancel</button>`
-                    $('#Modal').on('hidden.bs.modal', function () {
-                        $('body').removeClass('modal-open');
-                        $('.modal-backdrop').remove();
-                        let reject_dict = send_reject_for_game_to_server(receiver, requester);
-                        WaitingRoomSocket.send(JSON.stringify(reject_dict))
-                    })
-                }
-                if (message['invite_user']['requester'] === '{{ user.username }}'){
-                    $('#Modal').on('hide.bs.modal', function () {
-                        let reject_dict = send_reject_from_requester('{{ user.username }}', message['invite_user']['receiver']);
-                        WaitingRoomSocket.send(JSON.stringify(reject_dict))
-                        $('body').removeClass('modal-open');
-                        $('.modal-backdrop').remove();
-                    })
-                 }
+            if ('invite_user' in message) {
+                waiting_room_logic.make_invite(message['invite_user']);
             }
-            if (message['reject_user']) {
-                if (message['reject_user']['requester'] === '{{ user.username }}') {
-                    let rejector = message['reject_user']['rejector'];
-                    document.getElementById("modal-user-name").innerHTML = `<p>${rejector} don't want to play with You </p>`;
-                    $('#Modal').on('hidden.bs.modal', function () {
-                        $('body').removeClass('modal-open');
-                        $('.modal-backdrop').remove();
-                    })
-                }
+            if ('reject_user' in message) {
+                waiting_room_logic.reject_from_receiver(message['reject_user'])
             }
-            if (message['reject_from_requester']) {
-                if (message['reject_from_requester']['receiver'] === '{{ user.username }}') {
-                    let receiver = message['reject_from_requester']['receiver'];
-                    let requester = message['reject_from_requester']['requester'];
-                    document.getElementById("modal-user-name").innerHTML = `<p>O-ops, He is not(</p>`;
-                    document.getElementById("id_modal_footer").innerHTML =
-                        `<button type="button" class="btn btn-secondary" id="id_cancel_button"
-                        data-dismiss="modal">Cancel</button>`
-                }
+            if ('reject_from_requester' in message) {
+                waiting_room_logic.reject_from_requester(message['reject_from_requester']);
             }
-            };
+        };
+
         {# on click#}
         $(document).on("click", ".open_acept_game", function () {
             let UserID = $(this).data('id');
@@ -154,7 +167,7 @@
             document.getElementById("modal-user-name").innerHTML = `Waiting when ${UserID} accept your invite`;
             document.getElementById("id_modal_footer").innerHTML =
                         `<button type="button" class="btn btn-secondary" id="id_cancel_button" data-dismiss="modal">Cancel</button>`;
-            let request_dict = send_request_for_game_to_server(curent_user, UserID);
+            let request_dict = waiting_room_logic.send_request_for_game_to_server(curent_user, UserID);
             WaitingRoomSocket.send(JSON.stringify(request_dict));
         });
 

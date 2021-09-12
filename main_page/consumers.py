@@ -1,14 +1,10 @@
 import json
-import jsons
+
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.exceptions import DenyConnection
 from django.contrib.auth.models import AnonymousUser
-from django.core.cache import cache
-from asgiref.sync import async_to_sync
 
-
-from .services import WaitingRoom, PlayerGame, Game, create_game, serialize_and_put_to_cache, \
-    deserialize_and_get_from_cache
+from .services import WaitingRoom, PlayerGame, Game, serialize_and_put_to_cache, deserialize_and_get_from_cache
 
 
 class WaitingRoomConsumer(AsyncWebsocketConsumer):
@@ -67,15 +63,8 @@ class GameConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.player = PlayerGame(self.scope['user'])
         self.user_names_key = str(self.scope['url_route']['kwargs']['user1'] + '-' + self.scope['url_route']['kwargs']['user2'])
-        if not cache.get(self.user_names_key):
-            self.new_game = Game(self.scope['url_route']['kwargs']['user1'], self.scope['url_route']['kwargs']['user2'])
-            await serialize_and_put_to_cache(self.user_names_key, self.new_game)
-        else:
-            self.new_game = await deserialize_and_get_from_cache(self.user_names_key, Game)
-        print(self.new_game)
-        '''Необходимо при коннекте первого пользователя создавать экземпляр Game, а следующий только будет к нему
-         обращаться. Либо проверять создан ли экземпляр в кэше и если нет то создавать его и записывать в кэш'''
-        # self.new_game = Game(self.scope['url_route']['kwargs']['user1'], self.scope['url_route']['kwargs']['user2'])
+        self.new_game = Game(self.scope['url_route']['kwargs']['user1'], self.scope['url_route']['kwargs']['user2'])
+        await serialize_and_put_to_cache(self.user_names_key, self.new_game)
         self.room_group_name = f'game-{self.new_game.player1.username}-{self.new_game.player2.username}'
         # Join room group
         await self.channel_layer.group_add(
@@ -106,33 +95,10 @@ class GameConsumer(AsyncWebsocketConsumer):
             text_data = json.loads(text_data)
         user = text_data['user'] # curent user
         choice = text_data['choice']
+        self.new_game = await deserialize_and_get_from_cache(self.user_names_key)
         await self.new_game.add_user_choice(user, choice)
-        if not self.new_game.winner_data and len(self.new_game.player1.choices) == len(self.new_game.player2.choices):
-            '''both users make choice'''
-            if self.new_game.player1.choices[-1] == self.new_game.player2.choices[-1]:
-                '''no one winner'''
-            elif (self.new_game.player1.choices[-1] != self.new_game.player2.choices[-1]) and \
-                (self.new_game.player2.choices[-1] in self.new_game.KMN_WINER_DICT[self.new_game.player1.choices[-1]]):
-                '''User1 is winner in round'''
-                self.new_game.player1_score += 1
-            elif (self.new_game.player1.choices[-1] != self.new_game.player2.choices[-1]) and \
-                (self.new_game.player1.choices[-1] in self.new_game.KMN_WINER_DICT[self.new_game.player2.choices[-1]]):
-                '''user2 is winner round'''
-                self.new_game.player2_score += 1
-            if self.new_game.player1_score >= 5:
-                '''Total winner User1'''
-                self.new_game.winner_data = await self.new_game.get_winner_data(self.new_game.player1.username)
-            elif self.new_game.player2_score >= 5:
-                '''Total Winner User2'''
-                self.new_game.winner_data = await self.new_game.get_winner_data(self.new_game.player2.username)
-            message = jsons.dump(self.new_game)
-        elif not self.new_game.winner_data and len(self.new_game.player1.choices) != len(self.new_game.player2.choices):
-            '''Only one user make choice'''
-            message = {'make_choice': user}
-        else:
-            '''winner is allready exist'''
-            message = jsons.dump(self.new_game)
-        print(message)
+        message = await self.new_game.check_if_user_make_choice_or_win_round_or_win_game(user)
+        await serialize_and_put_to_cache(self.user_names_key, self.new_game)
         # Send message to room group
         await self.channel_layer.group_send(
             self.room_group_name,
